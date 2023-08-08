@@ -11,7 +11,7 @@ pipe = StableDiffusionXLPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, variant="fp16", use_safetensors=True
 )
 pipe.to("cuda")
-
+pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
 # Start flask app and set to ngrok
 app = Flask(__name__)
 run_with_ngrok(app)
@@ -24,9 +24,14 @@ def initial():
 @app.route('/submit-prompt', methods=['POST'])
 def generate_image():
   prompt = request.form['prompt-input']
+  negative_prompt=request.form["negative-prompt-input"]
   print(f"Generating an image of {prompt}")
 
-  image = pipe(prompt).images[0]
+  image = pipe(
+    prompt,
+    negative_prompt=negative_prompt,
+    num_images_per_prompt = 1
+    ).images[0]
   print("Image generated! Converting image ...")
   
   buffered = BytesIO()
